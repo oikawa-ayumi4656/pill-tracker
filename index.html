@@ -2,52 +2,326 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FBF3F6">
+<meta name="apple-mobile-web-app-title" content="ピル日数">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="manifest" href="manifest.json">
 <title>ピル日数</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
 <style>
-  body { font-family: -apple-system, sans-serif; text-align: center; padding: 40px 20px; }
-  #day { font-size: 44px; font-weight: bold; margin: 30px 0; }
-  button, input { font-size: 18px; padding: 12px; margin: 8px; width: 80%; }
-  .sub { color: #888; }
+  :root {
+    --bg: #FBF3F6;
+    --surface: #FFFFFF;
+    --ink: #3B2230;
+    --muted: #8E6B7D;
+    --line: #F0DCE5;
+    --accent: #D23C78;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #FBE1EB;
+    --rest: #8C7BB8;
+    --rest-soft: #ECE7F6;
+    --warn: #C0392B;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Zen Maru Gothic", -apple-system, "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif;
+    font-weight: 500;
+    padding: 0 16px;
+    padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(32px + env(safe-area-inset-bottom, 0px));
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 28px; padding: 20px; }
+  .hero { padding: 28px 20px 22px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
+  .phase {
+    align-self: center; font-size: 13px; letter-spacing: .08em; padding: 4px 12px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 700;
+  }
+  .phase.rest { background: var(--rest-soft); color: var(--rest); }
+  .count { display: flex; align-items: baseline; justify-content: center; gap: 4px; margin-top: 6px; }
+  .count b { font-size: 88px; line-height: 1; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .count.rest b { color: var(--rest); }
+  .count span { font-size: 22px; font-weight: 700; }
+  .info { color: var(--muted); font-size: 14px; }
+
+  .range { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+  .bar { position: relative; height: 10px; border-radius: 999px; background: var(--line); }
+  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--accent); }
+  .bar .min { position: absolute; top: -4px; bottom: -4px; left: 20%; width: 2px; background: var(--ink); border-radius: 1px; }
+  .ticks { position: relative; height: 16px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ticks span { position: absolute; top: 0; transform: translateX(-50%); }
+  .ticks span:first-child { transform: none; }
+  .ticks span:last-child { transform: translateX(-100%); }
+  .range-msg { font-size: 14px; font-weight: 700; text-align: center; color: var(--ink); }
+  .range-msg.warn { color: var(--warn); }
+  .rule { font-size: 12px; color: var(--muted); text-align: center; }
+
+  .today { display: flex; flex-direction: column; gap: 14px; }
+  .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .head h2 { margin: 0; font-size: 16px; }
+  .chip { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1.5px solid var(--line); color: var(--muted); }
+  .chip.done { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .chip.rest { background: var(--rest-soft); border-color: transparent; color: var(--rest); }
+
+  button { font: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .take {
+    width: 100%; border: 0; border-radius: 20px; padding: 18px; font-size: 20px; font-weight: 900;
+    background: var(--accent); color: var(--accent-ink); letter-spacing: .04em;
+    box-shadow: 0 6px 0 #9E2C5A;
+    transition: transform .08s, box-shadow .08s;
+  }
+  .take:active { transform: translateY(4px); box-shadow: 0 2px 0 #9E2C5A; }
+  .taken {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--accent-soft); border-radius: 20px; padding: 16px 18px;
+  }
+  .taken strong { color: var(--accent); font-size: 18px; }
+  .taken small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .link { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 14px; padding: 6px; }
+  .rest-note { background: var(--rest-soft); color: var(--rest); border-radius: 20px; padding: 16px 18px; font-weight: 700; text-align: center; }
+
+  .history { display: flex; flex-direction: column; gap: 12px; }
+  .hint { margin: 0; font-size: 12px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px 6px; }
+  .d {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--muted);
+    background: none; border: 0; padding: 0; font-variant-numeric: tabular-nums;
+  }
+  .d:disabled { cursor: default; }
+  .dot { width: 32px; height: 32px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; font-size: 14px; color: var(--accent-ink); }
+  .dot.on { background: var(--accent); border: 2px solid var(--accent); }
+  .dot.off { border-style: solid; border-color: var(--accent); }
+  .dot.rest { background: var(--rest-soft); border: 2px solid var(--rest-soft); }
+  .d.is-today { color: var(--ink); font-weight: 700; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 14px; height: 14px; border-width: 2px; }
+
+  .settings { display: flex; flex-direction: column; gap: 10px; padding: 4px 4px 0; }
+  .ghost {
+    width: 100%; border-radius: 16px; padding: 14px; font-size: 16px; font-weight: 700;
+    background: transparent; color: var(--rest); border: 1.5px solid var(--rest);
+  }
+  .confirm { display: flex; flex-direction: column; gap: 8px; }
+  .confirm p { margin: 0; font-size: 13px; text-align: center; color: var(--muted); }
+  .confirm p.warn { color: var(--warn); font-weight: 700; }
+  .confirm .row { display: flex; gap: 8px; }
+  .confirm button { flex: 1; border-radius: 16px; padding: 14px; font-size: 15px; font-weight: 700; border: 0; }
+  .confirm .yes { background: var(--rest); color: var(--surface); }
+  .confirm .no { background: var(--line); color: var(--ink); }
+  label { color: var(--muted); font-size: 13px; text-align: center; }
+  input[type=date] {
+    width: 100%; font: inherit; font-size: 16px; padding: 12px; border-radius: 16px;
+    border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
+  }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .take { transition: none; } }
 </style>
 </head>
 <body>
-  <div class="sub">今日は</div>
-  <div id="day">未設定</div>
-  <div class="sub" id="info"></div>
-  <button onclick="startBreak()">今日から休薬する</button>
-  <p class="sub">服薬開始日を手動で設定</p>
-  <input type="date" id="start" onchange="save(this.value)">
+<main>
+  <section class="card hero">
+    <span class="phase" id="phase">未設定</span>
+    <div class="count" id="count"><b id="num">–</b><span>日目</span></div>
+    <div class="info" id="info">服薬開始日を設定してください</div>
+    <div class="range" id="range" hidden>
+      <div class="bar"><i id="fill"></i><span class="min"></span></div>
+      <div class="ticks"><span style="left:0">1</span><span style="left:20%">24</span><span style="left:100%">120日</span></div>
+      <div class="range-msg" id="rangeMsg"></div>
+    </div>
+    <div class="rule">連続服用は最低24日・最大120日まで</div>
+  </section>
+
+  <section class="card today">
+    <div class="head">
+      <h2 id="todayLabel">今日</h2>
+      <span class="chip" id="chip">まだ</span>
+    </div>
+    <button class="take" id="takeBtn" type="button">飲んだ</button>
+    <div class="taken" id="takenBox" hidden>
+      <div><strong>今日は飲みました</strong><small id="takenAt"></small></div>
+      <button class="link" id="undoBtn" type="button">取り消す</button>
+    </div>
+    <div class="rest-note" id="restNote" hidden>休薬期間中なので飲まなくてOK</div>
+  </section>
+
+  <section class="card history">
+    <div class="head">
+      <h2>服薬の記録</h2>
+      <button class="link" id="moreBtn" type="button" hidden>すべて表示</button>
+    </div>
+    <p class="hint">過去の日付をタップすると、飲んだ／飲んでないを修正できます</p>
+    <div class="grid" id="grid"></div>
+    <div class="legend">
+      <span><i class="dot on"></i>飲んだ</span>
+      <span><i class="dot off"></i>飲んでない</span>
+      <span><i class="dot rest"></i>休薬</span>
+    </div>
+  </section>
+
+  <section class="settings">
+    <button class="ghost" id="breakBtn" type="button">今日から休薬する</button>
+    <div class="confirm" id="confirmBox" hidden>
+      <p id="confirmMsg"></p>
+      <div class="row">
+        <button class="yes" id="yesBtn" type="button">休薬を開始</button>
+        <button class="no" id="noBtn" type="button">やめる</button>
+      </div>
+    </div>
+    <label for="start">服薬開始日を手動で設定</label>
+    <input type="date" id="start">
+  </section>
+</main>
 <script>
-const REST = 4; // 休薬日数（処方内容に合わせて変更）
+const REST = 4;      // 休薬日数（処方内容に合わせて変更）
+const MIN_DAYS = 24; // 最低連続服用日数
+const MAX_DAYS = 120; // 最大連続服用日数
 const DAY = 86400000;
+const DEMO = false;
+const $ = id => document.getElementById(id);
+const W = ['日','月','火','水','木','金','土'];
+
+function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
 function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
 function toStr(d) { return d.toLocaleDateString('sv-SE'); } // yyyy-mm-dd
+function addDays(d, n) { return new Date(d.getTime() + n * DAY); }
+function dayIndex(d) { return Math.round((d - new Date(start + 'T00:00')) / DAY); } // 0 = 服薬開始日
 
-function save(v) { localStorage.setItem('start', v); render(); }
+let start = get('start');
+let taken = {};
+try { taken = JSON.parse(get('taken') || '{}'); } catch (e) { taken = {}; }
+let showAll = false;
 
-function startBreak() {
-  if (!confirm('今日から休薬を開始しますか？')) return;
-  save(toStr(new Date(today().getTime() + REST * DAY)));
+if (DEMO && !start) {
+  start = toStr(addDays(today(), -11));
+  for (let i = 1; i <= 11; i++) if (i !== 4) taken[toStr(addDays(today(), -i))] = '21:00';
 }
+
+function saveStart(v) { start = v; set('start', v); render(); }
+function saveTaken() { set('taken', JSON.stringify(taken)); render(); }
 
 function render() {
-  const s = localStorage.getItem('start');
-  if (!s) return;
-  document.getElementById('start').value = s;
-  const diff = Math.round((today() - new Date(s + 'T00:00')) / DAY);
-  const day = document.getElementById('day');
-  const info = document.getElementById('info');
-  if (diff >= 0) {
-    day.textContent = `連続服薬 ${diff + 1}日目`;
-    info.textContent = `${s} から服薬中`;
-  } else {
-    day.textContent = `休薬 ${diff + REST + 1}日目`;
-    info.textContent = `${s} に服薬再開`;
+  const t = today();
+  const key = toStr(t);
+  $('todayLabel').textContent = `今日 ${t.getMonth() + 1}/${t.getDate()}（${W[t.getDay()]}）`;
+
+  let resting = false, n = 0;
+  if (start) {
+    $('start').value = start;
+    const diff = dayIndex(t);
+    resting = diff < 0;
+    n = diff + 1;
+    $('phase').textContent = resting ? '休薬期間' : '連続服薬';
+    $('phase').className = 'phase' + (resting ? ' rest' : '');
+    $('count').className = 'count' + (resting ? ' rest' : '');
+    $('num').textContent = resting ? diff + REST + 1 : n;
+    $('info').textContent = resting ? `${start} に服薬再開` : `${start} から服薬中`;
+  }
+
+  // 休薬期間に入ったら前の周期の記録は消す
+  if (resting && Object.keys(taken).length) { taken = {}; set('taken', '{}'); }
+
+  // 24〜120日の目安
+  $('range').hidden = !start || resting;
+  if (start && !resting) {
+    $('fill').style.width = Math.min(n / MAX_DAYS, 1) * 100 + '%';
+    const msg = $('rangeMsg');
+    msg.className = 'range-msg';
+    if (n < MIN_DAYS) {
+      msg.textContent = `休薬できるのは24日目から（あと${MIN_DAYS - n}日）`;
+    } else if (n < MAX_DAYS) {
+      msg.textContent = `休薬できます（120日目まであと${MAX_DAYS - n}日）`;
+    } else {
+      msg.textContent = n === MAX_DAYS ? '今日が120日目です。明日から休薬してください' : '120日を超えています。休薬してください';
+      msg.className = 'range-msg warn';
+    }
+  }
+
+  const done = !!taken[key];
+  $('takeBtn').hidden = resting || done;
+  $('takenBox').hidden = resting || !done;
+  $('restNote').hidden = !resting;
+  $('takenAt').textContent = done ? `${taken[key]} に記録` : '';
+  const chip = $('chip');
+  chip.className = 'chip' + (resting ? ' rest' : done ? ' done' : '');
+  chip.textContent = resting ? '休薬中' : done ? '飲んだ ✓' : 'まだ';
+
+  renderGrid(t);
+}
+
+function renderGrid(t) {
+  // 今周期の服薬日数（休薬中は休薬日）を表示。初期表示は直近14日
+  let span = 14;
+  if (start) {
+    const diff = dayIndex(t);
+    const total = diff >= 0 ? diff + 1 : diff + REST + 1;
+    $('moreBtn').hidden = total <= 14;
+    $('moreBtn').textContent = showAll ? '直近だけ表示' : 'すべて表示';
+    if (showAll) span = Math.max(total, 1);
+  }
+  const grid = $('grid');
+  grid.innerHTML = '';
+  for (let i = span - 1; i >= 0; i--) {
+    const d = addDays(t, -i);
+    const k = toStr(d);
+    const idx = start ? dayIndex(d) : null;
+    const rest = start && idx < 0 && idx >= -REST;
+    const inCycle = start && idx >= 0;
+    const on = !!taken[k];
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'd' + (i === 0 ? ' is-today' : '');
+    const dot = document.createElement('span');
+    dot.className = 'dot' + (rest ? ' rest' : on ? ' on' : inCycle && i > 0 ? ' off' : '');
+    dot.textContent = on ? '✓' : '';
+    el.append(dot, i === 0 ? '今日' : `${d.getMonth() + 1}/${d.getDate()}`);
+    el.disabled = !inCycle;
+    el.setAttribute('aria-label', `${k} ${rest ? '休薬' : on ? '飲んだ' : '飲んでない'}`);
+    el.onclick = () => {
+      if (taken[k]) delete taken[k]; else taken[k] = i === 0 ? new Date().toTimeString().slice(0, 5) : '後から記録';
+      saveTaken();
+    };
+    grid.append(el);
   }
 }
+
+$('takeBtn').onclick = () => {
+  taken[toStr(today())] = new Date().toTimeString().slice(0, 5);
+  saveTaken();
+};
+$('undoBtn').onclick = () => { delete taken[toStr(today())]; saveTaken(); };
+$('moreBtn').onclick = () => { showAll = !showAll; render(); };
+$('breakBtn').onclick = () => {
+  const n = start ? dayIndex(today()) + 1 : 0;
+  const msg = $('confirmMsg');
+  if (start && n > 0 && n < MIN_DAYS) {
+    msg.textContent = `まだ${n}日目です。休薬は24日目以降が目安です`;
+    msg.className = 'warn';
+  } else {
+    msg.textContent = `今日から${REST}日間休薬します。服薬の記録はリセットされます`;
+    msg.className = '';
+  }
+  $('breakBtn').hidden = true; $('confirmBox').hidden = false;
+};
+$('noBtn').onclick = () => { $('breakBtn').hidden = false; $('confirmBox').hidden = true; };
+$('yesBtn').onclick = () => {
+  $('breakBtn').hidden = false; $('confirmBox').hidden = true;
+  saveStart(toStr(addDays(today(), REST)));
+};
+$('start').onchange = e => { if (e.target.value) saveStart(e.target.value); };
+
 render();
 </script>
 </body>
