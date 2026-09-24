@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>ピル日数</title>
+<style>
+  body { font-family: -apple-system, sans-serif; text-align: center; padding: 40px 20px; }
+  #day { font-size: 44px; font-weight: bold; margin: 30px 0; }
+  button, input { font-size: 18px; padding: 12px; margin: 8px; width: 80%; }
+  .sub { color: #888; }
+</style>
+</head>
+<body>
+  <div class="sub">今日は</div>
+  <div id="day">未設定</div>
+  <div class="sub" id="info"></div>
+  <button onclick="startBreak()">今日から休薬する</button>
+  <p class="sub">服薬開始日を手動で設定</p>
+  <input type="date" id="start" onchange="save(this.value)">
+<script>
+const REST = 4; // 休薬日数（処方内容に合わせて変更）
+const DAY = 86400000;
+
+function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function toStr(d) { return d.toLocaleDateString('sv-SE'); } // yyyy-mm-dd
+
+function save(v) { localStorage.setItem('start', v); render(); }
+
+function startBreak() {
+  if (!confirm('今日から休薬を開始しますか？')) return;
+  save(toStr(new Date(today().getTime() + REST * DAY)));
+}
+
+function render() {
+  const s = localStorage.getItem('start');
+  if (!s) return;
+  document.getElementById('start').value = s;
+  const diff = Math.round((today() - new Date(s + 'T00:00')) / DAY);
+  const day = document.getElementById('day');
+  const info = document.getElementById('info');
+  if (diff >= 0) {
+    day.textContent = `連続服薬 ${diff + 1}日目`;
+    info.textContent = `${s} から服薬中`;
+  } else {
+    day.textContent = `休薬 ${diff + REST + 1}日目`;
+    info.textContent = `${s} に服薬再開`;
+  }
+}
+render();
+</script>
+</body>
+</html>
