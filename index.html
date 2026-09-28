@@ -121,9 +121,13 @@
   .confirm .no { background: var(--line); color: var(--ink); }
   label { color: var(--muted); font-size: 13px; text-align: center; }
   input[type=date] {
-    width: 100%; font: inherit; font-size: 16px; padding: 12px; border-radius: 16px;
+    display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 50px;
+    -webkit-appearance: none; appearance: none;
+    font: inherit; font-size: 16px; padding: 12px; border-radius: 16px;
     border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
   }
+  input[type=date]::-webkit-date-and-time-value { text-align: center; }
+  .settings > * { min-width: 0; }
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) { .take { transition: none; } }
 </style>
