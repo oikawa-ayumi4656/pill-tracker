@@ -101,10 +101,47 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .unit{color:var(--muted);font-size:14px;margin-left:8px}
 .hint{font-size:13px;color:var(--muted);line-height:1.7;margin:10px 6px 0}
 #saveBtn{margin-top:26px}
+
+/* today's record */
+.take{margin-bottom:14px}
+.taken{display:flex;align-items:center;gap:14px;background:var(--surface);border-radius:22px;padding:14px 16px;margin-bottom:14px}
+.taken.pop{animation:pop .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes pop{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}
+.check{flex-shrink:0;width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--on-accent);
+  display:grid;place-items:center}
+.check svg{width:20px;height:20px}
+.taken div{flex:1;min-width:0}
+.taken strong{display:block;font-size:16px;font-weight:700}
+.taken small{display:block;font-size:13px;color:var(--muted);margin-top:2px;font-weight:500}
+.text-btn{border:0;background:none;color:var(--accent);font-size:14px;font-weight:700;padding:8px 4px}
+
+/* history */
+.panel{background:var(--surface);border-radius:22px;padding:18px 16px 16px;margin-bottom:14px}
+.panel-head{display:flex;justify-content:space-between;align-items:center;margin:0 4px 10px;min-height:36px}
+.panel-head h2{font-size:15px;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px 2px;text-align:center}
+.wd{font-size:11px;color:var(--muted);font-weight:600;padding-bottom:2px}
+.d{border:0;background:none;padding:2px 0 4px;display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-size:11px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.d:disabled{cursor:default}
+.d.is-today{color:var(--ink);font-weight:800}
+.dot{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;transition:background .2s,box-shadow .2s}
+.dot svg{width:16px;height:16px}
+.dot.on{background:var(--accent);color:var(--on-accent)}
+.dot.off{box-shadow:inset 0 0 0 1.5px var(--line)}
+.dot.rest{background:var(--rest-soft)}
+.dot.none{background:var(--tint);opacity:.5}
+.d.is-today .dot.off{box-shadow:inset 0 0 0 2px var(--accent)}
+.legend{display:flex;gap:16px;margin:14px 4px 0;font-size:12px;color:var(--muted);font-weight:500}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%}
+.legend .on{background:var(--accent)} .legend .off{box-shadow:inset 0 0 0 1.5px var(--muted)} .legend .rest{background:var(--rest-soft);box-shadow:inset 0 0 0 1px var(--rest)}
+.panel .hint{margin:10px 4px 0}
 .hidden{display:none !important}
 
 @media (prefers-reduced-motion: reduce){
-  .bar i,.seg::before,.btn,.seg button{transition:none}
+  .bar i,.seg::before,.btn,.seg button,.dot{transition:none}
+  .taken.pop{animation:none}
 }
 </style>
 </head>
@@ -128,6 +165,24 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
       </div>
       <div class="meta" id="meta"></div>
     </div>
+
+    <button class="btn primary take hidden" id="takeBtn" onclick="take()">飲んだ</button>
+    <div class="taken hidden" id="takenBox">
+      <span class="check" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10.5l3.2 3.2L15 6.5"/></svg></span>
+      <div><strong>今日は飲みました</strong><small id="takenAt"></small></div>
+      <button class="text-btn" onclick="untake()">取り消す</button>
+    </div>
+
+    <section class="panel hidden" id="history">
+      <div class="panel-head">
+        <h2>服薬の記録</h2>
+        <button class="text-btn hidden" id="moreBtn" onclick="showAll = !showAll; renderHistory(today())">すべて表示</button>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="legend"><span><i class="on"></i>飲んだ</span><span><i class="off"></i>飲んでいない</span><span><i class="rest"></i>休薬</span></div>
+      <p class="hint">過去の服薬日はタップして修正できます。</p>
+    </section>
+
     <button class="btn" id="action" onclick="act()"></button>
   </main>
 
@@ -160,6 +215,7 @@ const DAY = 86400000, KEY = 'daycount';
 const DEF = { mode:'flex', start:'', active:21, rest:4, limit:120, time:'21:00' };
 const $ = id => document.getElementById(id);
 let s = load(), mode = s.mode, inSettings = false;
+let taken = loadTaken(), showAll = false;
 
 function load(){
   const v = localStorage.getItem(KEY);
@@ -168,6 +224,18 @@ function load(){
   return old ? { ...DEF, start: old } : { ...DEF };
 }
 function store(){ localStorage.setItem(KEY, JSON.stringify(s)); }
+
+// 服薬の記録 { 'YYYY-MM-DD': '21:03' | '後から記録' }。旧バージョンと同じキーを使う
+function loadTaken(){
+  let t = {};
+  try { t = JSON.parse(localStorage.getItem('taken') || '{}') || {}; } catch (e) {}
+  const cutoff = ymd(addDays(today(), -400)); // 古い記録は整理する
+  let pruned = false;
+  for (const k in t) if (k < cutoff){ delete t[k]; pruned = true; }
+  if (pruned) localStorage.setItem('taken', JSON.stringify(t));
+  return t;
+}
+function storeTaken(){ localStorage.setItem('taken', JSON.stringify(taken)); }
 function today(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
 function parse(str){ return new Date(str + 'T00:00'); }
 function ymd(d){ return d.toLocaleDateString('sv-SE'); }
@@ -205,8 +273,64 @@ function setMeta(items){
   $('meta').innerHTML = items.map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('');
 }
 
+// その日が服薬日か休薬日か（開始前や不明は null）
+function phaseOf(d){
+  if (!s.start) return null;
+  const diff = between(parse(s.start), d);
+  if (s.mode === 'flex') return diff >= 0 ? 'active' : diff >= -s.rest ? 'rest' : null;
+  if (diff < 0) return null;
+  return diff % (s.active + s.rest) < s.active ? 'active' : 'rest';
+}
+// 今の服薬期間に入って何日目か（休薬中・開始前は 0）
+function runLength(t){
+  if (phaseOf(t) !== 'active') return 0;
+  const diff = between(parse(s.start), t);
+  return s.mode === 'flex' ? diff + 1 : diff % (s.active + s.rest) + 1;
+}
+
+const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.4l2.6 2.6L12 5.4"/></svg>';
+
+function renderRecord(t){
+  const key = ymd(t), active = phaseOf(t) === 'active', done = !!taken[key];
+  $('takeBtn').classList.toggle('hidden', !active || done);
+  $('takenBox').classList.toggle('hidden', !active || !done);
+  $('takenAt').textContent = done ? (taken[key].includes(':') ? `${taken[key]}に記録` : '後から記録') : '';
+  renderHistory(t);
+}
+function renderHistory(t){
+  const run = runLength(t);
+  $('history').classList.toggle('hidden', !s.start);
+  if (!s.start) return;
+  $('moreBtn').classList.toggle('hidden', run <= 14);
+  $('moreBtn').textContent = showAll ? '直近だけ表示' : 'すべて表示';
+  const span = showAll ? Math.max(14, run) : 14;
+  const first = addDays(t, -(span - 1));
+  let html = [...'日月火水木金土'].map(w => `<div class="wd">${w}</div>`).join('');
+  html += '<div></div>'.repeat(first.getDay());
+  for (let i = span - 1; i >= 0; i--){
+    const d = addDays(t, -i), k = ymd(d), ph = phaseOf(d), on = !!taken[k];
+    const cls = on ? 'on' : ph === 'rest' ? 'rest' : ph === 'active' ? 'off' : 'none';
+    const state = on ? '飲んだ' : ph === 'rest' ? '休薬' : ph === 'active' ? '飲んでいない' : '記録なし';
+    html += `<button class="d${i === 0 ? ' is-today' : ''}" data-k="${k}" ${ph === 'active' ? '' : 'disabled'}`
+      + ` aria-label="${d.getMonth()+1}月${d.getDate()}日 ${state}" onclick="toggleDay('${k}', ${i === 0})">`
+      + `<span class="dot ${cls}">${on ? CHECK : ''}</span>${i === 0 ? '今日' : d.getDate()}</button>`;
+  }
+  $('grid').innerHTML = html;
+}
+function now(){ return new Date().toTimeString().slice(0, 5); }
+function take(){
+  taken[ymd(today())] = now(); storeTaken(); renderRecord(today());
+  const box = $('takenBox'); box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
+}
+function untake(){ delete taken[ymd(today())]; storeTaken(); renderRecord(today()); }
+function toggleDay(k, isToday){
+  if (taken[k]) delete taken[k]; else taken[k] = isToday ? now() : '後から記録';
+  storeTaken(); renderRecord(today());
+}
+
 function render(){
   const t = today();
+  renderRecord(t);
   $('today').textContent = `${t.getMonth()+1}月${t.getDate()}日（${'日月火水木金土'[t.getDay()]}）`;
   $('barWrap').classList.add('hidden');
   const action = $('action');
